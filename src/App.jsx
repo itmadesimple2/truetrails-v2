@@ -777,12 +777,10 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
     if (filtered.length === 0) return;
     setAiLoading(true);
     setAiSummary(null);
-    const reviewText = filtered.map(r => r.name + " (" + r.age + ", " + r.nationality + ", " + r.travel_style + ", " + r.rating + "stars): " + r.title + " - " + r.body).join("
-
-");
-
-
+    const sep = "\n\n";
+    const reviewText = filtered.map(r => r.name + " (" + r.age + ", " + r.nationality + ", " + r.travel_style + ", " + r.rating + " stars): " + r.title + " - " + r.body).join(sep);
     const filterDesc = [ageF !== "All ages" && ageF, natF !== "All origins" && natF, styleF !== "All styles" && styleF].filter(Boolean).join(", ");
+    const prompt = "You are an honest travel summariser for TrueTrails built for travellers 50+. No marketing. Summarise what " + filtered.length + " real travellers" + (filterDesc ? " (" + filterDesc + ")" : "") + " say about " + data.name + ". Cover what they loved, any warnings or downsides, accessibility notes, and one concrete tip. Under 120 words. Second person. Flowing prose only. Reviews: " + reviewText;
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -790,25 +788,13 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `You are an honest travel summariser for TrueTrails — a platform built for travellers aged 50+. No marketing language. No hype. Practical and honest only.
-
-Summarise what ${filtered.length} real travellers${filterDesc ? ` (${filterDesc})` : ""} genuinely say about ${data.name}.
-
-Cover: what they loved, any practical warnings or downsides, accessibility notes if mentioned, and one concrete tip.
-
-Keep it under 120 words. Write in second person ("You'll find…", "Expect…"). No bullet points — flowing prose only.
-
-Reviews:
-${reviewText}`
-          }]
+          messages: [{ role: "user", content: prompt }]
         })
       });
       const json = await res.json();
       const text = json.content?.[0]?.text || "Unable to generate summary.";
       setAiSummary(text);
-    } catch {
+    } catch (e) {
       setAiSummary("Unable to generate summary right now.");
     }
     setAiLoading(false);
