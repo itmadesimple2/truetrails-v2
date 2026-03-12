@@ -148,6 +148,9 @@ html,body { font-family:'Outfit',sans-serif; background:#0f0e0c; color:#f2ede4; 
 .rc-title { font-family:'Cormorant Garamond',serif; font-size:0.95rem; font-weight:600; color:var(--text); margin-bottom:0.4rem; }
 .rc-body { font-size:0.78rem; color:var(--sub); line-height:1.7; }
 .rc-footer { display:flex; gap:0.4rem; margin-top:0.6rem; flex-wrap:wrap; align-items:center; }
+
+.trusted-badge { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.58rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--gold); background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.25); border-radius:20px; padding:0.2rem 0.55rem; }
+
 .verified-badge { font-size:0.6rem; color:var(--sage); font-weight:600; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:0.25rem; }
 .style-badge { font-size:0.58rem; padding:0.12rem 0.4rem; background:var(--raised); border-radius:4px; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; font-weight:600; }
 .review-photo { width:100%; max-height:200px; object-fit:cover; border-radius:8px; margin-top:0.6rem; cursor:zoom-in; }
@@ -749,7 +752,18 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
       setLoading(true);
       const field = isExp ? "experience_id" : "destination_id";
       const { data: r } = await supabase.from("reviews_v2").select("*").eq(field, data.id).order("created_at", { ascending: false });
-      setReviews(r || []);
+      if (r && r.length > 0) {
+        // count reviews per user to determine trusted status (5+)
+        const userIds = [...new Set(r.filter(x => x.user_id).map(x => x.user_id))];
+        const counts = {};
+        if (userIds.length > 0) {
+          const { data: allRevs } = await supabase.from("reviews_v2").select("user_id").in("user_id", userIds);
+          (allRevs || []).forEach(x => { counts[x.user_id] = (counts[x.user_id] || 0) + 1; });
+        }
+        setReviews(r.map(x => ({ ...x, trusted: x.user_id && (counts[x.user_id] || 0) >= 5 })));
+      } else {
+        setReviews(r || []);
+      }
       setLoading(false);
     })();
   }, [data.id]);
@@ -757,7 +771,17 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
   const loadReviews = async () => {
     const field = isExp ? "experience_id" : "destination_id";
     const { data: r } = await supabase.from("reviews_v2").select("*").eq(field, data.id).order("created_at", { ascending: false });
-    setReviews(r || []);
+    if (r && r.length > 0) {
+      const userIds = [...new Set(r.filter(x => x.user_id).map(x => x.user_id))];
+      const counts = {};
+      if (userIds.length > 0) {
+        const { data: allRevs } = await supabase.from("reviews_v2").select("user_id").in("user_id", userIds);
+        (allRevs || []).forEach(x => { counts[x.user_id] = (counts[x.user_id] || 0) + 1; });
+      }
+      setReviews(r.map(x => ({ ...x, trusted: x.user_id && (counts[x.user_id] || 0) >= 5 })));
+    } else {
+      setReviews(r || []);
+    }
     const table = isExp ? "experiences" : "destinations";
     const { data: s } = await supabase.from(table).select("avg_rating,review_count").eq("id", data.id).single();
     if (s) setStats({ avg_rating: s.avg_rating, review_count: s.review_count });
@@ -909,7 +933,8 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
                 <div className="rc-body">{r.body}</div>
                 {r.image_url && <img className="review-photo" src={r.image_url} alt="review" onError={e=>e.target.style.display="none"} />}
                 <div className="rc-footer">
-                  {r.verified && <span className="verified-badge"><span style={{width:5,height:5,background:"var(--sage)",borderRadius:"50%",display:"inline-block"}}/>Verified Visit</span>}
+                  {r.verified && <span className="verified-badge"><span style={{width:5,height:5,background:"var(--sage)",borderRadius:"50%",display:"inline-block"}}/>📷 Verified Visit</span>}
+                  {r.trusted && <span className="verified-badge" style={{background:"rgba(201,168,76,0.12)",borderColor:"rgba(201,168,76,0.3)",color:"var(--gold)"}}>⭐ Trusted Reviewer</span>}
                   <span className="style-badge">{r.travel_style}</span>
                 </div>
               </div>
@@ -983,7 +1008,7 @@ function ReviewSheet({ item, user, onClose, onSubmit }) {
       image_url: imageUrl,
       avatar_url: form.avatarUrl || null,
       youtube: form.youtube || null,
-      verified: false,
+      verified: !!imageUrl,  // auto-verified when photo uploaded
     };
     const { error: err } = await supabase.from("reviews_v2").insert([payload]);
     setSaving(false);
