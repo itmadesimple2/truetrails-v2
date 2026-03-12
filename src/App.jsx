@@ -99,6 +99,19 @@ html,body { font-family:'Outfit',sans-serif; background:#0f0e0c; color:#f2ede4; 
 .section-title { font-family:'Cormorant Garamond',serif; font-size:1.1rem; font-weight:600; color:var(--text); }
 .section-count { font-size:0.7rem; color:var(--muted); }
 
+
+/* DETAIL FILTERS + AI SUMMARY */
+.detail-filter-bar { padding:0.6rem 1.25rem; border-bottom:1px solid var(--border); display:flex; gap:0.4rem; overflow-x:auto; }
+.ai-summary-box { margin:0.75rem 1.25rem; background:linear-gradient(135deg,rgba(42,30,14,0.9),rgba(30,42,30,0.8)); border:1px solid rgba(201,168,76,0.25); border-radius:14px; overflow:hidden; }
+.ai-summary-header { display:flex; align-items:center; gap:0.5rem; padding:0.75rem 1rem 0.5rem; }
+.ai-summary-dot { width:6px; height:6px; background:var(--gold); border-radius:50%; flex-shrink:0; animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+.ai-summary-label { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.15em; font-weight:700; color:var(--gold); }
+.ai-summary-body { padding:0 1rem 0.85rem; font-size:0.8rem; color:var(--sub); line-height:1.75; }
+.ai-summary-btn { display:flex; align-items:center; justify-content:center; gap:0.5rem; width:calc(100% - 2rem); margin:0 1rem 0.85rem; background:rgba(201,168,76,0.12); border:1px solid rgba(201,168,76,0.25); border-radius:10px; padding:0.6rem; font-family:'Outfit',sans-serif; font-size:0.78rem; font-weight:600; color:var(--gold); cursor:pointer; }
+.ai-summary-btn:active { background:rgba(201,168,76,0.22); }
+.filter-count-badge { background:var(--terra); color:white; font-size:0.55rem; font-weight:700; border-radius:10px; padding:0.1rem 0.35rem; margin-left:0.3rem; }
+
 /* DETAIL */
 .detail-screen { flex:1; display:flex; flex-direction:column; overflow:hidden; }
 .detail-topbar { background:var(--surface); padding:0.75rem 1.25rem; display:flex; align-items:center; gap:0.75rem; border-bottom:1px solid var(--border); flex-shrink:0; }
@@ -725,6 +738,11 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
   const [showSheet, setShowSheet] = useState(false);
   const [toast, setToast] = useState(false);
   const [stats, setStats] = useState({ avg_rating: data.avg_rating, review_count: data.review_count });
+  const [ageF, setAgeF] = useState("All ages");
+  const [natF, setNatF] = useState("All origins");
+  const [styleF, setStyleF] = useState("All styles");
+  const [aiSummary, setAiSummary] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -747,6 +765,60 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
 
   const handleSubmit = async () => { await loadReviews(); setToast(true); setTimeout(() => setToast(false), 3500); };
 
+  const filtered = reviews.filter(r =>
+    (ageF === "All ages" || r.age === ageF) &&
+    (natF === "All origins" || r.nationality === natF) &&
+    (styleF === "All styles" || r.travel_style === styleF)
+  );
+
+  const activeFilters = [ageF, natF, styleF].filter(f => !f.startsWith("All")).length;
+
+  const generateSummary = async () => {
+    if (filtered.length === 0) return;
+    setAiLoading(true);
+    setAiSummary(null);
+    const reviewText = filtered.map(r => `${r.name} (${r.age}, ${r.nationality}, ${r.travel_style}, ${r.rating}★): "${r.title}" — ${r.body}`).join("
+
+");
+    const filterDesc = [ageF !== "All ages" && ageF, natF !== "All origins" && natF, styleF !== "All styles" && styleF].filter(Boolean).join(", ");
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: `You are an honest travel summariser for TrueTrails — a platform built for travellers aged 50+. No marketing language. No hype. Practical and honest only.
+
+Summarise what ${filtered.length} real travellers${filterDesc ? ` (${filterDesc})` : ""} genuinely say about ${data.name}.
+
+Cover: what they loved, any practical warnings or downsides, accessibility notes if mentioned, and one concrete tip.
+
+Keep it under 120 words. Write in second person ("You'll find…", "Expect…"). No bullet points — flowing prose only.
+
+Reviews:
+${reviewText}`
+          }]
+        })
+      });
+      const json = await res.json();
+      const text = json.content?.[0]?.text || "Unable to generate summary.";
+      setAiSummary(text);
+    } catch {
+      setAiSummary("Unable to generate summary right now.");
+    }
+    setAiLoading(false);
+  };
+
+  // Auto-clear summary when filters change
+  useEffect(() => { setAiSummary(null); }, [ageF, natF, styleF]);
+
+  const ages = ["All ages", ...new Set(reviews.map(r => r.age).filter(Boolean))];
+  const nats = ["All origins", ...new Set(reviews.map(r => r.nationality).filter(Boolean))];
+  const styles = ["All styles", ...new Set(reviews.map(r => r.travel_style).filter(Boolean))];
+
   return (
     <div className="detail-screen">
       <div className="detail-topbar">
@@ -758,7 +830,7 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
         </div>
       </div>
       <div className="scroll-area">
-        {data.hero_image_url && <img className="detail-hero-img" src={data.hero_image_url} alt={data.name} onError={e => e.target.style.display = "none"} />}
+        {data.hero_image_url && <img className="detail-hero-img" src={data.hero_image_url} alt={data.name} onError={e => e.target.style.display="none"} />}
         <div className="detail-hero">
           <div className="detail-eyebrow">{isExp ? `✨ Experience${data.type ? ` · ${data.type}` : ""}` : `📍 ${data.country} · ${data.continent}`}</div>
           <div className="detail-title">{data.name}</div>
@@ -777,22 +849,42 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
             {data.booking && <span className="attr-pill">🎟 {data.booking}</span>}
           </div>
         )}
-
-        {data.accessibility && !isExp && (
-          <div className="detail-attrs">
-            <span className="attr-pill">♿ {data.accessibility}</span>
-          </div>
-        )}
-
-        {(data.tags || []).length > 0 && (
-          <div className="detail-tags">{(data.tags || []).map(t => <span key={t} className="tag">{t}</span>)}</div>
-        )}
-
+        {data.accessibility && !isExp && <div className="detail-attrs"><span className="attr-pill">♿ {data.accessibility}</span></div>}
+        {(data.tags || []).length > 0 && <div className="detail-tags">{(data.tags||[]).map(t => <span key={t} className="tag">{t}</span>)}</div>}
         {data.description && <div className="detail-description">{data.description}</div>}
+
+        {/* Review filters */}
+        {reviews.length > 0 && (
+          <>
+            <div className="detail-filter-bar">
+              {ages.map(a => <button key={a} className={`filter-pill ${ageF===a?"active":""}`} onClick={()=>setAgeF(a)} style={{fontSize:"0.68rem"}}>{a}</button>)}
+            </div>
+            <div className="detail-filter-bar" style={{paddingTop:0}}>
+              {nats.map(n => <button key={n} className={`filter-pill ${natF===n?"active":""}`} onClick={()=>setNatF(n)} style={{fontSize:"0.68rem"}}>{n}</button>)}
+              {styles.map(s => <button key={s} className={`filter-pill ${styleF===s?"active":""}`} onClick={()=>setStyleF(s)} style={{fontSize:"0.68rem"}}>{s}</button>)}
+            </div>
+
+            {/* AI Summary */}
+            <div className="ai-summary-box">
+              <div className="ai-summary-header">
+                <div className="ai-summary-dot"/>
+                <span className="ai-summary-label">AI Honest Summary</span>
+                {activeFilters > 0 && <span className="filter-count-badge">{filtered.length} reviews filtered</span>}
+              </div>
+              {aiSummary ? (
+                <div className="ai-summary-body">{aiSummary}</div>
+              ) : (
+                <button className="ai-summary-btn" onClick={generateSummary} disabled={aiLoading || filtered.length === 0}>
+                  {aiLoading ? <><span style={{animation:"dp 1s infinite",display:"inline-block"}}>⟳</span> Generating…</> : `✦ Summarise ${filtered.length} review${filtered.length===1?"":"s"}${activeFilters > 0 ? " (filtered)" : ""}`}
+                </button>
+              )}
+            </div>
+          </>
+        )}
 
         <div className="section-header">
           <span className="section-title">Reviews</span>
-          <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>{reviews.length}</span>
+          <span style={{fontSize:"0.7rem",color:"var(--muted)"}}>{filtered.length}{filtered.length !== reviews.length ? ` of ${reviews.length}` : ""}</span>
         </div>
 
         {!user && (
@@ -807,29 +899,29 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
         <div className="reviews-section">
           {loading ? (
             <div className="loading-wrap"><div className="dot-row"><span /><span /><span /></div></div>
-          ) : reviews.length === 0 ? (
-            <div className="empty"><div className="empty-icon">💬</div><div className="empty-text">No reviews yet. Be the first!</div></div>
+          ) : filtered.length === 0 ? (
+            <div className="empty"><div className="empty-icon">🔍</div><div className="empty-text">No reviews match these filters.</div></div>
           ) : (
-            reviews.map(r => (
+            filtered.map(r => (
               <div key={r.id} className="review-card">
                 <div className="rc-header">
                   <div className="rc-left">
                     {r.avatar_url
-                      ? <img className="avatar-img" src={r.avatar_url} alt={r.initials} onError={e => e.target.style.display = "none"} />
-                      : <div className="avatar" style={{ background: avatarColor(r.initials) }}>{r.initials}</div>
+                      ? <img className="avatar-img" src={r.avatar_url} alt={r.initials} onError={e=>e.target.style.display="none"} />
+                      : <div className="avatar" style={{background:avatarColor(r.initials)}}>{r.initials}</div>
                     }
                     <div>
                       <div className="rc-name">{r.name}</div>
                       <div className="rc-meta"><span>{r.nationality}</span><span>·</span><span>{r.age}</span><span>·</span><span>{r.travel_style}</span></div>
                     </div>
                   </div>
-                  <div className="rc-right"><div className="rc-stars"><Stars n={r.rating} /></div><div className="rc-date">{formatDate(r.created_at)}</div></div>
+                  <div className="rc-right"><div className="rc-stars"><Stars n={r.rating}/></div><div className="rc-date">{formatDate(r.created_at)}</div></div>
                 </div>
                 <div className="rc-title">{r.title}</div>
                 <div className="rc-body">{r.body}</div>
-                {r.image_url && <img className="review-photo" src={r.image_url} alt="review" onError={e => e.target.style.display = "none"} />}
+                {r.image_url && <img className="review-photo" src={r.image_url} alt="review" onError={e=>e.target.style.display="none"} />}
                 <div className="rc-footer">
-                  {r.verified && <span className="verified-badge"><span style={{ width: 5, height: 5, background: "var(--sage)", borderRadius: "50%", display: "inline-block" }} />Verified Visit</span>}
+                  {r.verified && <span className="verified-badge"><span style={{width:5,height:5,background:"var(--sage)",borderRadius:"50%",display:"inline-block"}}/>Verified Visit</span>}
                   <span className="style-badge">{r.travel_style}</span>
                 </div>
               </div>
@@ -837,8 +929,8 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
           )}
         </div>
       </div>
-      {user && <button className="fab" onClick={() => setShowSheet(true)}>+</button>}
-      {showSheet && <ReviewSheet item={item} user={user} onClose={() => setShowSheet(false)} onSubmit={handleSubmit} />}
+      {user && <button className="fab" onClick={()=>setShowSheet(true)}>+</button>}
+      {showSheet && <ReviewSheet item={item} user={user} onClose={()=>setShowSheet(false)} onSubmit={handleSubmit}/>}
       {toast && <div className="toast">✓ Your review has been saved!</div>}
     </div>
   );
