@@ -187,6 +187,46 @@ html,body { font-family:'Outfit',sans-serif; background:#0f0e0c; color:#f2ede4; 
 .sign-in-prompt-btn { background:var(--terra); color:white; border:none; border-radius:10px; padding:0.6rem 1.5rem; font-family:'Outfit',sans-serif; font-size:0.82rem; font-weight:600; cursor:pointer; }
 
 
+
+/* PROFILE SCREEN */
+.profile-screen { flex:1; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding-bottom:calc(62px + var(--safe-bot)); }
+.profile-header { background:linear-gradient(160deg,#211d14,#2e2318); padding:2rem 1.25rem 1.5rem; display:flex; flex-direction:column; align-items:center; gap:0.75rem; border-bottom:1px solid var(--border); }
+.profile-avatar-wrap { position:relative; }
+.profile-avatar { width:80px; height:80px; border-radius:50%; object-fit:cover; border:3px solid var(--terra); }
+.profile-avatar-placeholder { width:80px; height:80px; border-radius:50%; background:var(--terra); display:flex; align-items:center; justify-content:center; font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:700; color:white; border:3px solid var(--terra2); }
+.profile-avatar-edit { position:absolute; bottom:2px; right:2px; width:24px; height:24px; background:var(--terra); border:2px solid var(--bg); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.65rem; cursor:pointer; }
+.profile-name { font-family:'Cormorant Garamond',serif; font-size:1.5rem; font-weight:700; color:var(--text); text-align:center; }
+.profile-meta { font-size:0.75rem; color:var(--muted); text-align:center; }
+.profile-stats-row { display:flex; gap:2rem; }
+.profile-stat { text-align:center; }
+.profile-stat-val { font-size:1.2rem; font-weight:700; color:var(--text); }
+.profile-stat-label { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); }
+.profile-section { margin:0.75rem 1.25rem 0; }
+.profile-section-title { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.12em; font-weight:700; color:var(--muted); margin-bottom:0.5rem; }
+.profile-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:0.75rem; }
+.profile-row { display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1rem; border-bottom:1px solid var(--border); cursor:pointer; }
+.profile-row:last-child { border-bottom:none; }
+.profile-row-left { display:flex; align-items:center; gap:0.65rem; }
+.profile-row-icon { font-size:1rem; width:20px; text-align:center; }
+.profile-row-label { font-size:0.85rem; color:var(--text); font-weight:500; }
+.profile-row-value { font-size:0.78rem; color:var(--muted); }
+.profile-row-arrow { font-size:0.7rem; color:var(--border); }
+.fav-card { display:flex; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:0.6rem; cursor:pointer; }
+.fav-card:active { border-color:var(--terra); }
+.fav-img { width:72px; flex-shrink:0; object-fit:cover; }
+.fav-placeholder { width:72px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1.5rem; background:var(--raised); }
+.fav-body { padding:0.65rem 0.75rem; flex:1; min-width:0; }
+.fav-type { font-size:0.55rem; text-transform:uppercase; letter-spacing:0.12em; font-weight:700; margin-bottom:0.15rem; }
+.fav-type.destination { color:var(--terra2); }
+.fav-type.experience { color:var(--sage); }
+.fav-name { font-family:'Cormorant Garamond',serif; font-size:0.95rem; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fav-meta { font-size:0.65rem; color:var(--muted); margin-top:0.15rem; }
+.fav-remove { padding:0 0.75rem; display:flex; align-items:center; color:var(--muted); font-size:0.8rem; cursor:pointer; flex-shrink:0; }
+.edit-sheet-title { font-family:'Cormorant Garamond',serif; font-size:1.25rem; font-weight:700; color:var(--text); margin-bottom:0.2rem; }
+.edit-sheet-sub { font-size:0.75rem; color:var(--muted); line-height:1.6; margin-bottom:1.25rem; }
+.sign-out-btn { width:100%; background:none; border:1.5px solid var(--border); border-radius:12px; padding:0.8rem; font-family:'Outfit',sans-serif; font-size:0.85rem; font-weight:600; color:var(--muted); cursor:pointer; margin-top:0.5rem; }
+.sign-out-btn:active { border-color:var(--terra); color:var(--terra); }
+
 /* HOME SCREEN */
 .home-screen { flex:1; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding-bottom:calc(62px + var(--safe-bot)); }
 .home-hero { position:relative; height:52dvh; overflow:hidden; background:#1a1612; }
@@ -645,6 +685,37 @@ function ResultCard({ item, type, onClick }) {
   );
 }
 
+
+/* ── FAV BUTTON ── */
+function FavButton({ user, type, itemId }) {
+  const [isFav, setIsFav] = useState(false);
+  const [favId, setFavId] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const field = type === "destination" ? "destination_id" : "experience_id";
+    supabase.from("favourites").select("id").eq("user_id", user.id).eq(field, itemId).maybeSingle()
+      .then(({ data }) => { if (data) { setIsFav(true); setFavId(data.id); } });
+  }, [user?.id, itemId]);
+
+  const toggle = async () => {
+    if (isFav && favId) {
+      await supabase.from("favourites").delete().eq("id", favId);
+      setIsFav(false); setFavId(null);
+    } else {
+      const field = type === "destination" ? "destination_id" : "experience_id";
+      const { data } = await supabase.from("favourites").insert([{ user_id: user.id, [field]: itemId }]).select().single();
+      if (data) { setIsFav(true); setFavId(data.id); }
+    }
+  };
+
+  return (
+    <button className="icon-btn" onClick={toggle} style={{ color: isFav ? "#e8845a" : "var(--muted)", fontSize: "1rem" }}>
+      {isFav ? "♥" : "♡"}
+    </button>
+  );
+}
+
 /* ── DETAIL SCREEN ── */
 function DetailScreen({ item, onBack, user, onSignIn }) {
   const { type, data } = item;
@@ -681,7 +752,10 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
       <div className="detail-topbar">
         <button className="back-btn" onClick={onBack}>←</button>
         <div className="detail-topbar-title">{data.name}</div>
-        <button className="icon-btn" onClick={() => user ? setShowSheet(true) : onSignIn()}>✏️</button>
+        <div style={{display:"flex",gap:"0.4rem"}}>
+          {user && <FavButton user={user} type={type} itemId={data.id} />}
+          <button className="icon-btn" onClick={() => user ? setShowSheet(true) : onSignIn()}>✏️</button>
+        </div>
       </div>
       <div className="scroll-area">
         {data.hero_image_url && <img className="detail-hero-img" src={data.hero_image_url} alt={data.name} onError={e => e.target.style.display = "none"} />}
@@ -892,6 +966,254 @@ function ReviewSheet({ item, user, onClose, onSubmit }) {
   );
 }
 
+
+/* ── PROFILE SCREEN ── */
+function ProfileScreen({ user, onSignIn, onSelectItem }) {
+  const [profile, setProfile] = useState(null);
+  const [favourites, setFavourites] = useState([]);
+  const [myReviews, setMyReviews] = useState([]);
+  const [showEdit, setShowEdit] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    if (!user) return;
+    setLoading(true);
+    const [{ data: p }, { data: favs }, { data: revs }] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", user.id).single(),
+      supabase.from("favourites").select("*, destinations(*), experiences(*)").eq("user_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("reviews_v2").select("*, destinations(name), experiences(name)").eq("user_id", user.id).order("created_at", { ascending: false }),
+    ]);
+    setProfile(p || {});
+    setFavourites(favs || []);
+    setMyReviews(revs || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [user?.id]);
+
+  const removeFav = async (favId, e) => {
+    e.stopPropagation();
+    await supabase.from("favourites").delete().eq("id", favId);
+    setFavourites(f => f.filter(x => x.id !== favId));
+  };
+
+  const handleFavTap = (fav) => {
+    if (fav.destinations) onSelectItem({ type: "destination", data: fav.destinations });
+    else if (fav.experiences) onSelectItem({ type: "experience", data: fav.experiences });
+  };
+
+  if (!user) return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", gap: "1rem" }}>
+      <div style={{ fontSize: "3rem" }}>👤</div>
+      <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "1.35rem", fontWeight: 700, color: "var(--text)", textAlign: "center" }}>Your TrueTrails Profile</div>
+      <div style={{ fontSize: "0.78rem", color: "var(--muted)", textAlign: "center", lineHeight: 1.7 }}>Sign in to save favourites, write reviews and build your travel history.</div>
+      <button className="submit-btn" style={{ maxWidth: 280 }} onClick={onSignIn}>Sign in or create account</button>
+    </div>
+  );
+
+  const displayName = profile?.username ? "@" + profile.username : profile?.display_name || user.email?.split("@")[0] || "Traveller";
+  const initials = displayName.replace("@","").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+  const avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url;
+
+  return (
+    <div className="profile-screen">
+      <div className="profile-header">
+        <div className="profile-avatar-wrap">
+          {avatarUrl
+            ? <img className="profile-avatar" src={avatarUrl} alt={displayName} onError={e => e.target.style.display="none"} />
+            : <div className="profile-avatar-placeholder">{initials}</div>
+          }
+          <div className="profile-avatar-edit" onClick={() => setShowEdit(true)}>✏️</div>
+        </div>
+        <div className="profile-name">{displayName}</div>
+        <div className="profile-meta">
+          {[profile?.nationality, profile?.age, profile?.travel_style].filter(Boolean).join(" · ")}
+        </div>
+        <div className="profile-stats-row">
+          <div className="profile-stat"><div className="profile-stat-val">{myReviews.length}</div><div className="profile-stat-label">Reviews</div></div>
+          <div className="profile-stat"><div className="profile-stat-val">{favourites.length}</div><div className="profile-stat-label">Saved</div></div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading-wrap"><div className="dot-row"><span /><span /><span /></div></div>
+      ) : (
+        <>
+          {/* Saved Favourites */}
+          <div className="profile-section" style={{ marginTop: "1rem" }}>
+            <div className="profile-section-title">Saved Places</div>
+            {favourites.length === 0 ? (
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "14px", padding: "1.5rem", textAlign: "center" }}>
+                <div style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>🔖</div>
+                <div style={{ fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.6 }}>Tap the ♡ on any destination or experience to save it here.</div>
+              </div>
+            ) : (
+              favourites.map(fav => {
+                const item = fav.destinations || fav.experiences;
+                const type = fav.destinations ? "destination" : "experience";
+                if (!item) return null;
+                return (
+                  <div key={fav.id} className="fav-card" onClick={() => handleFavTap(fav)}>
+                    {item.hero_image_url
+                      ? <img className="fav-img" src={item.hero_image_url} alt={item.name} onError={e => e.target.style.display="none"} />
+                      : <div className="fav-placeholder">{type === "destination" ? "📍" : "✨"}</div>
+                    }
+                    <div className="fav-body">
+                      <div className={`fav-type ${type}`}>{type === "destination" ? "📍 Destination" : "✨ Experience"}</div>
+                      <div className="fav-name">{item.name}</div>
+                      <div className="fav-meta">{item.country || item.type || ""}</div>
+                    </div>
+                    <div className="fav-remove" onClick={e => removeFav(fav.id, e)}>✕</div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* My Reviews */}
+          <div className="profile-section" style={{ marginTop: "1rem" }}>
+            <div className="profile-section-title">My Reviews</div>
+            {myReviews.length === 0 ? (
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "14px", padding: "1.5rem", textAlign: "center" }}>
+                <div style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>✍️</div>
+                <div style={{ fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.6 }}>You haven't written any reviews yet. Share your honest experiences!</div>
+              </div>
+            ) : (
+              myReviews.map(r => (
+                <div key={r.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "0.85rem", marginBottom: "0.6rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.35rem" }}>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--terra2)" }}>{r.destinations?.name || r.experiences?.name}</div>
+                    <Stars n={r.rating} />
+                  </div>
+                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "0.9rem", fontWeight: 600, color: "var(--text)", marginBottom: "0.25rem" }}>{r.title}</div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--sub)", lineHeight: 1.65 }}>{r.body.slice(0, 120)}{r.body.length > 120 ? "…" : ""}</div>
+                  <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: "0.4rem" }}>{formatDate(r.created_at)}</div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Account settings */}
+          <div className="profile-section" style={{ marginTop: "1rem" }}>
+            <div className="profile-section-title">Account</div>
+            <div className="profile-card">
+              <div className="profile-row" onClick={() => setShowEdit(true)}>
+                <div className="profile-row-left"><span className="profile-row-icon">✏️</span><span className="profile-row-label">Edit Profile</span></div>
+                <span className="profile-row-arrow">›</span>
+              </div>
+              <div className="profile-row" onClick={async () => { await supabase.auth.signOut(); }}>
+                <div className="profile-row-left"><span className="profile-row-icon">🚪</span><span className="profile-row-label" style={{ color: "var(--terra2)" }}>Sign Out</span></div>
+                <span className="profile-row-arrow">›</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: "1rem" }} />
+        </>
+      )}
+
+      {showEdit && <EditProfileSheet user={user} profile={profile} onClose={() => { setShowEdit(false); load(); }} />}
+    </div>
+  );
+}
+
+/* ── EDIT PROFILE SHEET ── */
+function EditProfileSheet({ user, profile, onClose }) {
+  const [form, setForm] = useState({
+    display_name: profile?.display_name || "",
+    username: profile?.username || "",
+    age: profile?.age || "",
+    nationality: profile?.nationality || "",
+    travel_style: profile?.travel_style || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url || user?.user_metadata?.avatar_url || null);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const save = async () => {
+    setSaving(true); setError(null);
+    let avatarUrl = profile?.avatar_url || null;
+    if (avatarFile) {
+      const ext = avatarFile.name.split(".").pop();
+      const path = `avatars/${user.id}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("review-images").upload(path, avatarFile, { contentType: avatarFile.type, upsert: true });
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from("review-images").getPublicUrl(path);
+        avatarUrl = urlData.publicUrl + "?t=" + Date.now();
+      }
+    }
+    const { error: err } = await supabase.from("profiles").upsert({
+      id: user.id,
+      email: user.email,
+      display_name: form.display_name,
+      username: form.username || null,
+      age: form.age,
+      nationality: form.nationality,
+      travel_style: form.travel_style,
+      avatar_url: avatarUrl,
+      updated_at: new Date().toISOString(),
+    });
+    setSaving(false);
+    if (err) setError(err.message);
+    else onClose();
+  };
+
+  return (
+    <div className="sheet-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="sheet">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.85rem 0 0.75rem" }}>
+          <div style={{ width: "36px", height: "4px", background: "var(--border)", borderRadius: "2px", margin: "0 auto" }} />
+          <button onClick={onClose} style={{ background: "var(--raised)", border: "1px solid var(--border)", borderRadius: "50%", width: "30px", height: "30px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--muted)", fontSize: "0.85rem", position: "absolute", right: "1.25rem" }}>✕</button>
+        </div>
+        <div className="edit-sheet-title">Edit Profile</div>
+        <div className="edit-sheet-sub">Your details appear on reviews you write.</div>
+
+        {/* Avatar */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.25rem" }}>
+          <div style={{ position: "relative" }}>
+            {avatarPreview
+              ? <img src={avatarPreview} style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "3px solid var(--terra)" }} onError={e => e.target.style.display="none"} />
+              : <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--terra)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem", fontWeight: 700, color: "white", fontFamily: "'Cormorant Garamond',serif" }}>{(form.display_name||user.email||"?")[0].toUpperCase()}</div>
+            }
+            <input type="file" accept="image/*" id="avatar-upload" style={{ display: "none" }} onChange={e => { const f = e.target.files[0]; if(f) { setAvatarFile(f); setAvatarPreview(URL.createObjectURL(f)); }}} />
+            <label htmlFor="avatar-upload" style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, background: "var(--terra)", border: "2px solid var(--bg)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "0.65rem" }}>📷</label>
+          </div>
+        </div>
+
+        <div className="form-group"><label className="form-label">Display Name</label><input className="form-input" placeholder="How you appear on reviews" value={form.display_name} onChange={e => set("display_name", e.target.value)} /></div>
+        <div className="form-group"><label className="form-label">Username (optional)</label><input className="form-input" placeholder="e.g. tony_travels" value={form.username} onChange={e => set("username", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} /></div>
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">Age Group</label>
+            <select className="form-select" value={form.age} onChange={e => set("age", e.target.value)}>
+              <option value="">Select…</option>
+              {["Under 35","35–49","50–54","55–64","65+"].map(a => <option key={a}>{a}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Travel Style</label>
+            <select className="form-select" value={form.travel_style} onChange={e => set("travel_style", e.target.value)}>
+              <option value="">Select…</option>
+              {["Solo","Couple","Family","Group"].map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Nationality</label>
+          <select className="form-select" value={form.nationality} onChange={e => set("nationality", e.target.value)}>
+            <option value="">Select…</option>
+            {["Australian","New Zealander","British","American","Canadian","German","French","Japanese","Singaporean","Other"].map(n => <option key={n}>{n}</option>)}
+          </select>
+        </div>
+        {error && <div className="auth-error">⚠️ {error}</div>}
+        <button className="submit-btn" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Profile"}</button>
+      </div>
+    </div>
+  );
+}
+
 /* ── AUTH SCREEN ── */
 function AuthScreen({ onClose }) {
   const [mode, setMode] = useState("signin");
@@ -1009,7 +1331,7 @@ export default function App() {
             <div className="topbar-logo">True<span>Trails</span></div>
             <div className="topbar-right">
               {user
-                ? <div style={{ width: 32, height: 32, borderRadius: "50%", overflow: "hidden", cursor: "pointer", border: "2px solid var(--border)" }} onClick={() => setShowAuth(false)}>
+                ? <div style={{ width: 32, height: 32, borderRadius: "50%", overflow: "hidden", cursor: "pointer", border: "2px solid var(--border)" }} onClick={() => setTab("profile")}>
                   {user.user_metadata?.avatar_url
                     ? <img src={user.user_metadata.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     : <div style={{ width: "100%", height: "100%", background: "var(--terra)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 700, color: "white" }}>{(user.email || "?")[0].toUpperCase()}</div>
@@ -1023,12 +1345,14 @@ export default function App() {
           {tab === "home" && <HomeScreen onSelectItem={handleSelectItem} onGoToMap={() => setTab("map")} onGoToSearch={() => setTab("search")} user={user} onSignIn={() => setShowAuth(true)} />}
           {tab === "map" && <MapScreen onSelectItem={handleSelectItem} user={user} onSignIn={() => setShowAuth(true)} />}
           {tab === "search" && <SearchScreen onSelectItem={handleSelectItem} />}
+          {tab === "profile" && <ProfileScreen user={user} onSignIn={() => setShowAuth(true)} onSelectItem={handleSelectItem} />}
 
           <div className="bottom-nav">
             {[
               { id: "home", icon: "🏠", label: "Home" },
               { id: "map", icon: "🗺️", label: "Map" },
               { id: "search", icon: "🔍", label: "Search" },
+              { id: "profile", icon: "👤", label: "Profile" },
             ].map(n => (
               <button key={n.id} className={`nav-item ${tab === n.id ? "active" : ""}`} onClick={() => setTab(n.id)}>
                 <span className="nav-icon">{n.icon}</span>
