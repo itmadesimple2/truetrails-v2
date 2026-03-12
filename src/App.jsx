@@ -777,11 +777,11 @@ function DetailScreen({ item, onBack, user, onSignIn }) {
     if (filtered.length === 0) return;
     setAiLoading(true);
     setAiSummary(null);
-    const reviewText = filtered.map(r => r.name + " (" + r.age + ", " + r.nationality + ", " + r.travel_style + ", " + r.rating + "★): " + r.title + " — " + r.body).join("
+    const reviewText = filtered.map(r => r.name + " (" + r.age + ", " + r.nationality + ", " + r.travel_style + ", " + r.rating + "stars): " + r.title + " - " + r.body).join("
 
 ");
 
-");
+
     const filterDesc = [ageF !== "All ages" && ageF, natF !== "All origins" && natF, styleF !== "All styles" && styleF].filter(Boolean).join(", ");
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
